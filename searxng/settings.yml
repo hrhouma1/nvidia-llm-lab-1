@@ -1,0 +1,18 @@
+# Configuration minimale SearXNG pour l'app (RAG web).
+# Le point clé : activer le format "json" pour que web_search.py puisse parser.
+use_default_settings: true
+
+server:
+  # IMPORTANT : remplace cette valeur par une chaîne aléatoire unique.
+  # PowerShell :  python -c "import secrets; print(secrets.token_hex(32))"
+  secret_key: "CHANGE_MOI_avec_une_chaine_aleatoire_de_64_caracteres_minimum"
+  limiter: false
+  image_proxy: true
+
+search:
+  # Sans "json" ici, l'API renvoie une erreur 403 "format not allowed".
+  formats:
+    - html
+    - json
+  safe_search: 0
+  default_lang: "fr"
