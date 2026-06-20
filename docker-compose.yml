@@ -1,14 +1,42 @@
-# SearXNG : métamoteur de recherche auto-hébergé pour le RAG web de l'app.
-# Démarrage :  docker compose up -d
-# Test     :  http://localhost:8888  (et API JSON : /search?q=test&format=json)
+# Stack complete : app Streamlit + SearXNG, isolees sur un reseau interne.
+#
+# Prerequis : un fichier .env contenant NVIDIA_API_KEY (copie .env.example).
+# Demarrage :  docker compose up --build -d
+# App        :  http://localhost:8501
+# SearXNG    :  http://localhost:8888  (debug ; l'app l'appelle via le reseau interne)
+
 services:
+  streamlit:
+    build: .
+    image: clone-opus-nvidia:latest
+    container_name: clone-opus-app
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      # L'app joint SearXNG par le nom de service sur le reseau interne
+      - SEARXNG_URL=http://searxng:8080
+    depends_on:
+      - searxng
+    restart: unless-stopped
+    networks:
+      - appnet
+
   searxng:
     image: searxng/searxng:latest
     container_name: searxng
-    ports:
-      - "8888:8080"
     volumes:
       - ./searxng:/etc/searxng:rw
     environment:
       - SEARXNG_BASE_URL=http://localhost:8888/
+    # Expose facultatif (debug direct de l'API JSON). L'app n'en a pas besoin.
+    ports:
+      - "8888:8080"
     restart: unless-stopped
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge

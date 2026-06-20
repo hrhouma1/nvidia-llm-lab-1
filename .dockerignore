@@ -1,0 +1,31 @@
+# Secrets : ne JAMAIS embarquer la cle dans l'image
+.env
+.env.local
+*.key
+
+# Git
+.git
+.git_home_backup
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Fichiers non necessaires a l'execution de l'app
+documentation/
+scripts/
+searxng/
+*.md
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

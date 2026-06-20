@@ -46,6 +46,29 @@ streamlit run app.py
 
 L'app s'ouvre sur `http://localhost:8501`.
 
+## Option Docker (recommandée) : tout en conteneurs
+
+Lance l'app **et** SearXNG d'un coup, isolés sur un réseau interne. Prérequis : Docker Desktop.
+
+```powershell
+copy .env.example .env   # puis colle ta clé nvapi- dedans
+docker compose up --build -d
+```
+
+Ou via le script (gère .env + clé secrète SearXNG automatiquement) :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\02-docker-up.ps1
+```
+
+- App : http://localhost:8501
+- SearXNG : http://localhost:8888 (debug ; l'app l'appelle en interne via `http://searxng:8080`)
+- Logs : `docker compose logs -f` · Arrêt : `docker compose down`
+
+Bonnes pratiques appliquées : `Dockerfile` multi-stage (`python:3.12-slim`),
+utilisateur **non-root**, `HEALTHCHECK` Streamlit, réseau interne, `.env` monté
+(jamais dans l'image), `.dockerignore` excluant secrets et fichiers superflus.
+
 ## Utilisation
 
 - **Barre latérale** : clé API, sélecteur de modèle, system prompt, température, top-p, tokens max.
