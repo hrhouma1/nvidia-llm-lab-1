@@ -24,17 +24,25 @@ class SearchResult:
     content: str
 
 
-def search(
-    query: str,
-    *,
-    base_url: str = DEFAULT_SEARXNG_URL,
-    max_results: int = 5,
-    timeout: int = 15,
-) -> list[SearchResult]:
-    """Interroge SearXNG et retourne au plus `max_results` résultats.
+# URLs de repli essayees automatiquement si l'URL fournie echoue (DNS/connexion).
+# Couvre les deux contextes courants : app en local et app en Docker.
+_FALLBACK_URLS = [
+    "http://localhost:8888",
+    "http://127.0.0.1:8888",
+    "http://searxng:8080",
+]
 
-    Lève une exception réseau/HTTP en cas d'échec (gérée par l'appelant).
-    """
+
+def _candidate_urls(base_url: str) -> list[str]:
+    """Construit la liste des URLs a essayer : celle fournie d'abord, puis les replis."""
+    candidates = [base_url.rstrip("/")] if base_url else []
+    for url in _FALLBACK_URLS:
+        if url not in candidates:
+            candidates.append(url)
+    return candidates
+
+
+def _query_one(base_url: str, query: str, max_results: int, timeout: int) -> list[SearchResult]:
     endpoint = base_url.rstrip("/") + "/search"
     params = {
         "q": query,
@@ -59,6 +67,35 @@ def search(
             )
         )
     return results
+
+
+def search(
+    query: str,
+    *,
+    base_url: str = DEFAULT_SEARXNG_URL,
+    max_results: int = 5,
+    timeout: int = 15,
+) -> list[SearchResult]:
+    """Interroge SearXNG et retourne au plus `max_results` résultats.
+
+    Essaie l'URL fournie puis des URLs de repli (localhost / searxng) afin de
+    fonctionner aussi bien en local qu'en Docker, sans configuration manuelle.
+    Lève la dernière exception réseau/HTTP si toutes les URLs échouent.
+    """
+    last_error: Exception | None = None
+    for candidate in _candidate_urls(base_url):
+        try:
+            return _query_one(candidate, query, max_results, timeout)
+        except (requests.ConnectionError, requests.Timeout) as error:
+            # URL injoignable (DNS/connexion) : on tente la suivante.
+            last_error = error
+            continue
+        except Exception as error:  # noqa: BLE001 - autre erreur : on remonte direct
+            raise error
+
+    if last_error is not None:
+        raise last_error
+    return []
 
 
 def build_context(results: list[SearchResult]) -> str:
