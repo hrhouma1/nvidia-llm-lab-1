@@ -64,10 +64,53 @@ Le modèle **ne fait jamais l'action lui-même** : il *demande*, ton code *exéc
 
 ---
 
+## Prompts à COPIER pour voir le modèle appeler les outils
+
+> Mode d'emploi : dans la barre latérale, **COCHE « Activer le mode agent
+> (function calling) »**. Pose un des prompts ci-dessous. Sous la réponse,
+> déplie le volet **« Outils utilisés »** (ou regarde l'encart « Agent : appels
+> d'outils » qui s'affiche en direct) : tu y verras le nom de l'outil appelé.
+
+### Déclenche `web_search` (info à jour)
+
+```text
+Quel est le dernier modèle d'IA sorti récemment ?
+Qui est le premier ministre du Canada actuellement ?
+Quelle est la dernière version stable de Python ?
+Quelles sont les actus tech de cette semaine ?
+```
+
+### Déclenche `calculator` (calcul exact)
+
+```text
+Calcule 18473 * 9244
+Combien font 87654 * 4321 ?
+Quelle est la racine : (123456 + 7890) * 12 ?
+```
+
+### Déclenche PLUSIEURS outils (chaînage)
+
+```text
+Cherche la population actuelle du Canada, puis multiplie-la par 2.
+Trouve le prix actuel du Bitcoin en dollars, puis calcule la valeur de 3,5 BTC.
+```
+
+### Ne déclenche AUCUN outil (concept stable — c'est normal)
+
+```text
+Explique la différence entre TCP et UDP en 2 phrases.
+Écris une fonction Python qui inverse une chaîne.
+```
+
+> Comparaison utile : pose le **même** prompt de calcul **mode agent OFF** puis
+> **ON**. OFF → souvent un nombre faux ; ON → résultat exact via `calculator`.
+
+---
+
 ## Exercices
 
 > Active **« Mode agent »** dans la barre latérale pour ces exercices. Observe le
-> volet « Agent : appels d'outils » : tu verras quel outil le modèle a choisi.
+> volet « Outils utilisés » : tu verras quel outil le modèle a choisi.
 
 ### Exercice 1 — Le modèle décide de chercher
 
@@ -78,8 +121,7 @@ Le modèle **ne fait jamais l'action lui-même** : il *demande*, ton code *exéc
 
 ### Exercice 2 — Le calcul exact
 
-- **Prompt :** `Combien font 18 473 × 92 birthday... non : 18473 × 9244 ?`
-  (ou simplement `Calcule 18473 * 9244`)
+- **Prompt :** `Calcule 18473 * 9244`
 - **Étape A — mode agent OFF :** le modèle répond souvent un nombre **faux**.
 - **Étape B — mode agent ON :** il appelle `calculator` → résultat **exact**.
 - **Leçon :** la puissance du modèle n'aide pas ; il faut l'outil.
