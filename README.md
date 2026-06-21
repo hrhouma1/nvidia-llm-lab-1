@@ -82,9 +82,13 @@ utilisateur **non-root**, `HEALTHCHECK` Streamlit, réseau interne, `.env` mont�
 | --- | --- |
 | `app.py` | Interface de chat Streamlit |
 | `nvidia_client.py` | Client OpenAI vers NVIDIA, listing des modèles, streaming + retry |
+| `web_search.py` | Recherche web (SearXNG) pour le RAG |
+| `tools.py` | Agent « maison » (function calling : web_search + calculator) |
+| `agent_langchain.py` | Même agent, version LangChain (`bind_tools`) |
 | `requirements.txt` | Dépendances Python |
 | `.env.example` | Modèle de configuration de la clé |
 | `ARTICLE.md` | Article détaillé sur build.nvidia.com |
+| `documentation/` | Cours et exercices (limites LLM, RAG, paramètres, agent, LangChain) |
 
 ## Dépannage
 

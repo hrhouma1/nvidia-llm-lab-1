@@ -24,7 +24,7 @@ RUN useradd --create-home --uid 1000 appuser
 
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
-COPY app.py nvidia_client.py web_search.py tools.py ./
+COPY app.py nvidia_client.py web_search.py tools.py agent_langchain.py ./
 
 USER appuser
 

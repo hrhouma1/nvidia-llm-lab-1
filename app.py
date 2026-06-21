@@ -29,6 +29,7 @@ from web_search import (
     search,
 )
 from tools import run_agent
+from agent_langchain import run_langchain_agent
 
 load_dotenv()
 
@@ -109,6 +110,13 @@ def render_sidebar() -> dict:
                 "calculatrice). Prend le pas sur la recherche web manuelle."
             ),
         )
+        agent_engine = st.radio(
+            "Moteur de l'agent",
+            options=["Maison", "LangChain"],
+            horizontal=True,
+            help="Maison = boucle écrite à la main (tools.py). LangChain = même agent via le framework.",
+            disabled=not agent_enabled,
+        )
 
         st.divider()
         st.subheader("Recherche web (SearXNG)")
@@ -134,6 +142,7 @@ def render_sidebar() -> dict:
         "top_p": top_p,
         "max_tokens": max_tokens,
         "agent_enabled": agent_enabled,
+        "agent_engine": agent_engine,
         "web_enabled": web_enabled,
         "searxng_url": searxng_url.strip(),
         "web_max_results": web_max_results,
@@ -299,49 +308,78 @@ def main() -> None:
 
 
 def _run_agent_turn(client, config: dict) -> None:
-    """Exécute un tour en mode agent (function calling) et l'affiche."""
-    api_messages = build_api_messages(config["system_prompt"])
+    """Exécute un tour en mode agent (function calling) et l'affiche.
+
+    Deux moteurs : "Maison" (tools.py) ou "LangChain" (agent_langchain.py).
+    """
+    engine = config.get("agent_engine", "Maison")
     with st.chat_message("assistant"):
-        status = st.status("Agent : réflexion et appels d'outils...", expanded=True)
+        status = st.status(
+            f"Agent ({engine}) : réflexion et appels d'outils...", expanded=True
+        )
 
         def on_tool(name: str, args: dict) -> None:
             status.write(f"Appel outil **{name}** : `{args}`")
 
+        reasoning_text = ""
         try:
-            result = run_agent(
-                client,
-                config["model"],
-                api_messages,
-                searxng_url=config["searxng_url"],
-                temperature=config["temperature"],
-                top_p=config["top_p"],
-                max_tokens=config["max_tokens"],
-                on_tool=on_tool,
-            )
+            if engine == "LangChain":
+                # Le dernier message est la question courante ; le reste = historique.
+                history = st.session_state.messages[:-1]
+                query = st.session_state.messages[-1]["content"]
+                lc = run_langchain_agent(
+                    config["api_key"],
+                    config["model"],
+                    config["system_prompt"],
+                    history,
+                    query,
+                    searxng_url=config["searxng_url"],
+                    temperature=config["temperature"],
+                    top_p=config["top_p"],
+                    max_tokens=config["max_tokens"],
+                )
+                for s in lc.steps:
+                    on_tool(s["name"], s["arguments"])
+                content, steps = lc.content, lc.steps
+            else:
+                api_messages = build_api_messages(config["system_prompt"])
+                result = run_agent(
+                    client,
+                    config["model"],
+                    api_messages,
+                    searxng_url=config["searxng_url"],
+                    temperature=config["temperature"],
+                    top_p=config["top_p"],
+                    max_tokens=config["max_tokens"],
+                    on_tool=on_tool,
+                )
+                content, steps, reasoning_text = result.content, result.steps, result.reasoning
         except Exception as error:  # noqa: BLE001
             status.update(label="Erreur", state="error")
-            st.error(f"Erreur en mode agent : {error}")
+            st.error(f"Erreur en mode agent ({engine}) : {error}")
             st.session_state.messages.pop()
             return
 
         label = (
-            f"Agent : {len(result.steps)} appel(s) d'outil"
-            if result.steps
-            else "Agent : aucune action nécessaire"
+            f"Agent ({engine}) : {len(steps)} appel(s) d'outil"
+            if steps
+            else f"Agent ({engine}) : aucune action nécessaire"
         )
         status.update(label=label, state="complete", expanded=False)
 
-        if result.reasoning:
+        if reasoning_text:
             with st.expander("Réflexion du modèle"):
-                st.markdown(result.reasoning)
-        st.markdown(result.content)
+                st.markdown(reasoning_text)
+        if steps:
+            render_tool_steps(steps)
+        st.markdown(content)
 
     st.session_state.messages.append(
         {
             "role": "assistant",
-            "content": result.content,
-            "reasoning": result.reasoning,
-            "tool_steps": result.steps,
+            "content": content,
+            "reasoning": reasoning_text,
+            "tool_steps": steps,
         }
     )
 
