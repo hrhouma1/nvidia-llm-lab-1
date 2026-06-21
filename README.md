@@ -85,6 +85,7 @@ utilisateur **non-root**, `HEALTHCHECK` Streamlit, réseau interne, `.env` mont�
 | `web_search.py` | Recherche web (SearXNG) pour le RAG |
 | `tools.py` | Agent « maison » (function calling : web_search + calculator) |
 | `agent_langchain.py` | Même agent, version LangChain (`bind_tools`) |
+| `agent_langgraph.py` | Même agent, version LangGraph (graphe d'états) |
 | `requirements.txt` | Dépendances Python |
 | `.env.example` | Modèle de configuration de la clé |
 | `ARTICLE.md` | Article détaillé sur build.nvidia.com |

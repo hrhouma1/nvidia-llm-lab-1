@@ -30,6 +30,7 @@ from web_search import (
 )
 from tools import run_agent
 from agent_langchain import run_langchain_agent
+from agent_langgraph import run_langgraph_agent
 
 load_dotenv()
 
@@ -112,9 +113,12 @@ def render_sidebar() -> dict:
         )
         agent_engine = st.radio(
             "Moteur de l'agent",
-            options=["Maison", "LangChain"],
+            options=["Maison", "LangChain", "LangGraph"],
             horizontal=True,
-            help="Maison = boucle écrite à la main (tools.py). LangChain = même agent via le framework.",
+            help=(
+                "Maison = boucle à la main (tools.py). LangChain = même agent via "
+                "bind_tools. LangGraph = agent modélisé en graphe d'états."
+            ),
             disabled=not agent_enabled,
         )
 
@@ -323,11 +327,14 @@ def _run_agent_turn(client, config: dict) -> None:
 
         reasoning_text = ""
         try:
-            if engine == "LangChain":
+            if engine in ("LangChain", "LangGraph"):
                 # Le dernier message est la question courante ; le reste = historique.
                 history = st.session_state.messages[:-1]
                 query = st.session_state.messages[-1]["content"]
-                lc = run_langchain_agent(
+                runner = (
+                    run_langchain_agent if engine == "LangChain" else run_langgraph_agent
+                )
+                fw = runner(
                     config["api_key"],
                     config["model"],
                     config["system_prompt"],
@@ -338,9 +345,9 @@ def _run_agent_turn(client, config: dict) -> None:
                     top_p=config["top_p"],
                     max_tokens=config["max_tokens"],
                 )
-                for s in lc.steps:
+                for s in fw.steps:
                     on_tool(s["name"], s["arguments"])
-                content, steps = lc.content, lc.steps
+                content, steps = fw.content, fw.steps
             else:
                 api_messages = build_api_messages(config["system_prompt"])
                 result = run_agent(
