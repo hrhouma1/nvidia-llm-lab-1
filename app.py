@@ -28,6 +28,7 @@ from web_search import (
     build_context,
     search,
 )
+from tools import run_agent
 
 load_dotenv()
 
@@ -99,11 +100,22 @@ def render_sidebar() -> dict:
         max_tokens = st.slider("Tokens max", 256, 8192, 2048, 256)
 
         st.divider()
+        st.subheader("Mode outils (agent)")
+        agent_enabled = st.toggle(
+            "Activer le mode agent (function calling)",
+            value=False,
+            help=(
+                "Le MODÈLE décide lui-même d'appeler des outils (recherche web, "
+                "calculatrice). Prend le pas sur la recherche web manuelle."
+            ),
+        )
+
+        st.divider()
         st.subheader("Recherche web (SearXNG)")
         web_enabled = st.toggle(
             "Activer la recherche web",
             value=False,
-            help="Interroge SearXNG avant de répondre pour des infos à jour (RAG web).",
+            help="Interroge SearXNG avant de répondre pour des infos à jour (RAG web manuel).",
         )
         searxng_url = st.text_input(
             "URL SearXNG",
@@ -121,6 +133,7 @@ def render_sidebar() -> dict:
         "temperature": temperature,
         "top_p": top_p,
         "max_tokens": max_tokens,
+        "agent_enabled": agent_enabled,
         "web_enabled": web_enabled,
         "searxng_url": searxng_url.strip(),
         "web_max_results": web_max_results,
@@ -133,12 +146,20 @@ def render_sources(sources: list[dict]) -> None:
             st.markdown(f"[{i}] [{s['title'] or s['url']}]({s['url']})")
 
 
+def render_tool_steps(steps: list[dict]) -> None:
+    with st.expander(f"Outils utilisés ({len(steps)})"):
+        for i, s in enumerate(steps, start=1):
+            st.markdown(f"**{i}. {s['name']}** — `{s['arguments']}`")
+
+
 def render_history() -> None:
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             if msg["role"] == "assistant" and msg.get("reasoning"):
                 with st.expander("Réflexion du modèle"):
                     st.markdown(msg["reasoning"])
+            if msg["role"] == "assistant" and msg.get("tool_steps"):
+                render_tool_steps(msg["tool_steps"])
             st.markdown(msg["content"])
             if msg["role"] == "assistant" and msg.get("sources"):
                 render_sources(msg["sources"])
@@ -214,6 +235,14 @@ def main() -> None:
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    client = get_client(config["api_key"])
+
+    # MODE AGENT : le modèle décide lui-même d'appeler des outils.
+    if config["agent_enabled"]:
+        _run_agent_turn(client, config)
+        return
+
+    # MODE CLASSIQUE (avec recherche web manuelle optionnelle).
     sources: list[dict] = []
     last_user_override: str | None = None
     if config["web_enabled"]:
@@ -221,7 +250,6 @@ def main() -> None:
             last_user_override, sources = run_web_search(prompt, config)
 
     api_messages = build_api_messages(config["system_prompt"], last_user_override)
-    client = get_client(config["api_key"])
 
     with st.chat_message("assistant"):
         if sources:
@@ -266,6 +294,54 @@ def main() -> None:
             "content": answer_text,
             "reasoning": reasoning_text,
             "sources": sources,
+        }
+    )
+
+
+def _run_agent_turn(client, config: dict) -> None:
+    """Exécute un tour en mode agent (function calling) et l'affiche."""
+    api_messages = build_api_messages(config["system_prompt"])
+    with st.chat_message("assistant"):
+        status = st.status("Agent : réflexion et appels d'outils...", expanded=True)
+
+        def on_tool(name: str, args: dict) -> None:
+            status.write(f"Appel outil **{name}** : `{args}`")
+
+        try:
+            result = run_agent(
+                client,
+                config["model"],
+                api_messages,
+                searxng_url=config["searxng_url"],
+                temperature=config["temperature"],
+                top_p=config["top_p"],
+                max_tokens=config["max_tokens"],
+                on_tool=on_tool,
+            )
+        except Exception as error:  # noqa: BLE001
+            status.update(label="Erreur", state="error")
+            st.error(f"Erreur en mode agent : {error}")
+            st.session_state.messages.pop()
+            return
+
+        label = (
+            f"Agent : {len(result.steps)} appel(s) d'outil"
+            if result.steps
+            else "Agent : aucune action nécessaire"
+        )
+        status.update(label=label, state="complete", expanded=False)
+
+        if result.reasoning:
+            with st.expander("Réflexion du modèle"):
+                st.markdown(result.reasoning)
+        st.markdown(result.content)
+
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": result.content,
+            "reasoning": result.reasoning,
+            "tool_steps": result.steps,
         }
     )
 
